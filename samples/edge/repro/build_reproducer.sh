@@ -89,6 +89,16 @@ then
   exit -1
 fi
 
+export EDGE_CXXFLAGS=
+if [[ "${EDGE_VALIDATE}" == "1" ]]
+then
+  export EDGE_CXXFLAGS="-DPP_REPRODUCER_VALIDATE "${EDGE_CXXFLAGS}
+fi
+if [[ "${EDGE_DEBUG}" == "1" ]]
+then
+  export EDGE_CXXFLAGS="-DPP_REPRODUCER_DEBUG "${EDGE_CXXFLAGS}
+fi
+
 if [[ -z $EDGE_BIN_DIR ]]
 then
   EDGE_BIN_DIR=./bin/

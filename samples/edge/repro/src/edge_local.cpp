@@ -19,11 +19,12 @@
 #endif
 
 
+
 int main(int i_argc, char *i_argv[]) {
   std::cout << std::endl;
   std::cout << "EDGE Local Update Reproducer" << std::endl;
 
-  double                                  l_dT = 0.01;
+  double                                  l_dT = 0.000001;
   unsigned int                            l_nSteps;
   unsigned int                            l_nElements;
   t_elementChars                        * l_elChars; /* zero initialization */
@@ -45,6 +46,7 @@ int main(int i_argc, char *i_argv[]) {
     std::cout << "Usage: ./local {NUM_STEPS} {NUM_ELEMENTS} [-h|--help]\n" << std::endl;
     std::exit(1);
   }
+  std::cout << "Order: " << ORDER << ", Precision: " << PP_PRECISION << ", Fused runs: " << N_CRUNS << std::endl;
   std::cout << "#Steps: " << l_nSteps << ", #Elements: " << l_nElements << std::endl;
   std::cout << std::endl;
 
@@ -67,6 +69,7 @@ int main(int i_argc, char *i_argv[]) {
 
 
   // 3. Run solvers
+  std::cout << "Runing solvers" << std::endl;
   unsigned long long l_start = libxsmm_timer_tick();
 #ifdef PP_USE_OMP
   #pragma omp parallel firstprivate( l_nSteps, l_nElements, l_dT )  \
@@ -84,7 +87,7 @@ int main(int i_argc, char *i_argv[]) {
     l_lastEl = std::min(l_lastEl, l_nElements);
     unsigned int l_numEl = l_lastEl - l_firstEl;
 
-    for ( unsigned int l_step = 0; l_step < l_nSteps; l_step++ )
+    for ( unsigned int l_step = 0; l_step < l_nSteps; l_step++ ) {
       edge::elastic::solvers::AderDg::local< unsigned int,
                                              real_base,
                                              edge::data::MmXsmmFused< real_base > > 
@@ -105,6 +108,10 @@ int main(int i_argc, char *i_argv[]) {
                                              nullptr,
                                              l_recvs,
                                              l_mm           );
+#ifdef PP_USE_OMP
+      #pragma omp barrier
+#endif
+    }
   }
   unsigned long long l_end = libxsmm_timer_tick();
 
@@ -117,9 +124,32 @@ int main(int i_argc, char *i_argv[]) {
   unsigned long long l_flops = (unsigned long long)l_local_flops[ORDER-1] * PP_N_CRUNS * \
                                l_nElements * l_nSteps;
   double l_gflops = (double)l_flops / (l_time * 1000000000);
-  std::cout << "Elapsed time: " << l_time << "s" << std::endl;
-  std::cout << "Performance:  " << l_gflops << "GFLOPS" << std::endl;
+  std::cout << "Elapsed time: " << l_time << " s" << std::endl;
+  std::cout << "Performance:  " << l_gflops << " GFLOPS" << std::endl;
   std::cout << std::endl;
+
+#ifdef PP_REPRODUCER_VALIDATE
+  std::string l_dumpFileName1 = "./local_o"+std::to_string(ORDER)+"_"
+                                "f"+std::to_string(PP_PRECISION)+"_"
+                                "el"+std::to_string(l_nElements)+"_"
+                                "stp"+std::to_string(l_nSteps)+"_dofs.log";
+  std::string l_dumpFileName2 = "./local_o"+std::to_string(ORDER)+"_"
+                                "f"+std::to_string(PP_PRECISION)+"_"
+                                "el"+std::to_string(l_nElements)+"_"
+                                "stp"+std::to_string(l_nSteps)+"_tInt.log";
+  std::ofstream l_fp1( l_dumpFileName1 );
+  std::ofstream l_fp2( l_dumpFileName2 );
+  for ( unsigned int l_el = 0; l_el < l_nElements; l_el++ ) {
+    for ( unsigned int l_qt = 0; l_qt < N_QUANTITIES; l_qt++ ) {
+      for ( unsigned int l_md = 0; l_md < N_ELEMENT_MODES; l_md++ ) {
+        for ( unsigned int l_cfr = 0; l_cfr < N_CRUNS; l_cfr++ ) {
+          l_fp1 << l_dofs[l_el][l_qt][l_md][l_cfr] << "\n";
+          l_fp2 << l_tInt[l_el][l_qt][l_md][l_cfr] << "\n";
+        }
+      }
+    }
+  }
+#endif
 
 
   // 5. Clean up
@@ -146,7 +176,7 @@ int main(int i_argc, char *i_argv[]) {
   free( edge::parallel::g_scratchMem );
 
   delete[] l_elChars;
-  
+
   
   return 0;
 }

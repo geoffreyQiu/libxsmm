@@ -4,6 +4,7 @@
 #include <iostream>
 #include <string>
 #include <cstdlib>
+#include <ctime>
 
 #ifdef PP_USE_OMP
 #include <omp.h>
@@ -76,7 +77,7 @@ void setupDg( t_dg & i_dg ) {
     l_nzCols = CE_N_ELEMENT_MODES( T_SDISC.ELEMENT, ORDER-l_de );
 
     // add data for the first CK-stiff matrix or shrinking stiff matrices
-    if ( l_de == 1 || l_nzCols < l_nzRows ) {
+    if ( l_de == 1 || true ) {
       for ( unsigned short l_di = 0; l_di < N_DIM; l_di++ ) {
         selectSubSparseMatrixCsc( l_stiffTVal[l_di], l_stiffTColPtr[l_di], l_stiffTRowIdx[l_di],
                                   l_nzRows, l_nzCols,
@@ -87,6 +88,7 @@ void setupDg( t_dg & i_dg ) {
       }
     }
     else {
+      assert(false);
       for ( unsigned short l_di = 0; l_di < N_DIM; l_di++ ) {
         i_dg.mat.stiffT[(l_de-1)*N_DIM+l_di] = i_dg.mat.stiffT[(l_de-2)*N_DIM+l_di];
         /* suggested modification to : https://github.com/3343/edge/blob/develop/src/dg/setup_ader.inc#L126 */
@@ -153,6 +155,9 @@ void setupStarM ( unsigned int  const      i_nEl,
 
   io_starM = (t_matStar (*)[N_DIM]) new t_matStar[i_nEl*N_DIM];
 
+#ifdef PP_USE_OMP
+  #pragma omp parallel for firstprivate( i_nEl, io_starM, l_mStarVal )
+#endif
   for ( unsigned int l_el = 0; l_el < i_nEl; l_el++ ) {
     for ( unsigned int l_di = 0; l_di < N_DIM; l_di++ ) {
       for ( unsigned int l_nz = 0; l_nz < N_MAT_STAR; l_nz++ ) {
@@ -173,6 +178,9 @@ void setupFluxSolv ( unsigned int  const      i_nEl,
 
   io_fluxSolvers = (t_fluxSolver (*)[C_ENT[T_SDISC.ELEMENT].N_FACES]) new t_fluxSolver[i_nEl*C_ENT[T_SDISC.ELEMENT].N_FACES];
 
+#ifdef PP_USE_OMP
+  #pragma omp parallel for firstprivate( i_nEl, io_fluxSolvers, l_fSolvVal )
+#endif
   for ( unsigned int l_el = 0; l_el < i_nEl; l_el++ ) {
     for ( unsigned int l_fa = 0; l_fa < C_ENT[T_SDISC.ELEMENT].N_FACES; l_fa++ ) {
       for ( unsigned int l_i = 0; l_i < N_QUANTITIES; l_i++ ) {
@@ -197,12 +205,20 @@ void setupTensor ( unsigned int  const      i_nEl,
                   ALIGNMENT.ELEMENT_MODES.PRIVATE, 
                   (size_t)(i_nEl*N_QUANTITIES*N_ELEMENT_MODES*N_CRUNS*sizeof(real_base)) );
 
+#ifdef PP_REPRODUCER_VALIDATE // generate identical input for valication
+  srand(0);
+#else
+  srand(time(0));
+#ifdef PP_USE_OMP
+  #pragma omp parallel for firstprivate( i_nEl, io_dofs, io_tInt )
+#endif
+#endif
   for ( unsigned int l_el = 0; l_el < i_nEl; l_el++ ) {
     for ( unsigned int l_qt = 0; l_qt < N_QUANTITIES; l_qt++ ) {
       for ( unsigned int l_md = 0; l_md < N_ELEMENT_MODES; l_md++ ) {
         for ( unsigned int l_cfr = 0; l_cfr < N_CRUNS; l_cfr++ ) {
-          io_dofs[l_el][l_qt][l_md][l_cfr] = ((real_base)rand() / RAND_MAX);
-          io_tInt[l_el][l_qt][l_md][l_cfr] = ((real_base)rand() / RAND_MAX);
+          io_dofs[l_el][l_qt][l_md][l_cfr] = ((real_base)rand() / RAND_MAX / 1000000.0);
+          io_tInt[l_el][l_qt][l_md][l_cfr] = ((real_base)rand() / RAND_MAX / 1000000.0);
         }
       }
     }
@@ -252,22 +268,22 @@ void setupKernel ( edge::data::MmXsmmFused< real_base >  & io_mm ) {
   unsigned int l_nzCols = N_ELEMENT_MODES; 
   unsigned int l_nzRows = N_ELEMENT_MODES;
 
-  // iterate over derivatives (recusive calls)
+  // iterate over derivatives (recursive calls)
   for ( unsigned short l_de = 1; l_de < ORDER; l_de++ ) {
     // determine non-zero block in the next iteration
     l_nzCols = CE_N_ELEMENT_MODES( T_SDISC.ELEMENT, ORDER-l_de );
 
     // generate libxsmm kernel for transposed stiffness matrices
     for ( unsigned short l_di = 0; l_di < N_DIM; l_di++ ) {
-      std::vector< real_base >    l_malVal;
+      std::vector< real_base >    l_matVal;
       std::vector< unsigned int > l_matColPtr;
       std::vector< unsigned int > l_matRowIdx;
       selectSubSparseMatrixCsc( l_stiffTVal[l_di], l_stiffTColPtr[l_di], l_stiffTRowIdx[l_di],
                                 l_nzRows, l_nzCols, 
-                                l_malVal, l_matColPtr, l_matRowIdx );
+                                l_matVal, l_matColPtr, l_matRowIdx );
 
       io_mm.add(  false,
-                 &l_matColPtr[0],  &l_matRowIdx[0], &l_malVal[0],
+                 &l_matColPtr[0],  &l_matRowIdx[0], &l_matVal[0],
                   N_QUANTITIES, l_nzCols, l_nzRows,
                   N_ELEMENT_MODES, 0, l_nzCols,
                   real_base(1.0), real_base(0.0),

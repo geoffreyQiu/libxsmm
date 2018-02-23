@@ -94,6 +94,11 @@ class edge::data::MmXsmmFused< float > {
                    << " M=" << i_m << " N=" << i_n << " K=" << i_k
                    << " ldA=" << i_ldA << " ldB=" << i_ldB << " ldC=" << i_ldC
                    << " alpha=" << i_alpha << " beta=" << i_beta;
+#elif defined PP_REPRODUCER_DEBUG
+      std::cout << "  adding single precision XSMM-kernel #" << m_kernels.size() << " (sparse)"
+                << " M=" << i_m << " N=" << i_n << " K=" << i_k
+                << " ldA=" << i_ldA << " ldB=" << i_ldB << " ldC=" << i_ldC
+                << " alpha=" << i_alpha << " beta=" << i_beta << std::endl;
 #endif
  
 #ifdef PP_USE_EDGE_IO
@@ -173,6 +178,11 @@ class edge::data::MmXsmmFused< double > {
                    << " M=" << i_m << " N=" << i_n << " K=" << i_k
                    << " ldA=" << i_ldA << " ldB=" << i_ldB << " ldC=" << i_ldC
                    << " alpha=" << i_alpha << " beta=" << i_beta;
+#elif defined PP_REPRODUCER_DEBUG
+      std::cout << "  adding double precision XSMM-kernel #" << m_kernels.size() << " (sparse)"
+                << " M=" << i_m << " N=" << i_n << " K=" << i_k
+                << " ldA=" << i_ldA << " ldB=" << i_ldB << " ldC=" << i_ldC
+                << " alpha=" << i_alpha << " beta=" << i_beta << std::endl;
 #endif
 
 #ifdef PP_USE_EDGE_IO

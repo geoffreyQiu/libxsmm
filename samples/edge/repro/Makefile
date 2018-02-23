@@ -43,7 +43,7 @@ endif
 EDGE_FLAGS += -DPP_ORDER=$(EDGE_ORDER) -DPP_PRECISION=$(EDGE_PRECISION) -DPP_N_CRUNS=$(EDGE_CFR)
 
 # settings for compiler
-CXXFLAGS = $(EDGE_FLAGS)
+CXXFLAGS = $(EDGE_CXXFLAGS) $(EDGE_FLAGS)
 CFLAGS = $(NULL)
 DFLAGS = $(NULL)
 IFLAGS = -I$(INCDIR) -I$(DEPDIR)/include
@@ -68,7 +68,11 @@ MODULES := $(addsuffix .mod,$(basename $(FTNSRCS))) $(addsuffix .modmic,$(basena
 
 EXFILES := $(OUTDIR)/local_$(EDGE_CONFIG) \
            $(OUTDIR)/neigh_$(EDGE_CONFIG) #\
-           $(OUTDIR)/combined_$(EDGE_CONFIG)
+           $(OUTDIR)/combine_$(EDGE_CONFIG)
+TESTEXS := $(OUTDIR)/test_local_$(EDGE_CONFIG) \
+           $(OUTDIR)/test_neigh_$(EDGE_CONFIG) #\
+           $(OUTDIR)/test_combine_$(EDGE_CONFIG) #\
+           $(OUTDIR)/test_helper
 
 ifeq ($(EDGE_ARCH), avx512)
 ifeq ($(CXX), icpc)
@@ -80,14 +84,19 @@ endif
 
 
 .PHONY: all
-all: $(EXFILES)
+all: $(EXFILES) test
+
+test: $(TESTEXS)
+
+test_helper: $(OUTDIR)/test_helper
+
+local: $(OUTDIR)/local_$(EDGE_CONFIG)
+neigh: $(OUTDIR)/neigh_$(EDGE_CONFIG)
+#combine: $(OUTDIR)/combine_$(EDGE_CONFIG)
 
 .PHONY: compile
 compile: $(OBJECTS)
 
-local: $(OUTDIR)/local_$(EDGE_CONFIG)
-neigh: $(OUTDIR)/neigh_$(EDGE_CONFIG)
-#combined: $(OUTDIR)/combined_$(EDGE_CONFIG)
 
 
 $(OUTDIR)/local_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_local_$(EDGE_CONFIG).o $(LIBDEP)
@@ -96,8 +105,22 @@ $(OUTDIR)/local_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_local_$(EDGE_CONF
 $(OUTDIR)/neigh_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_neigh_$(EDGE_CONFIG).o $(LIBDEP)
 	$(XLD) -o $@ $(BLDDIR)/edge_neigh_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
 
-#$(OUTDIR)/combined_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_combined_$(EDGE_CONFIG).o $(LIBDEP)
-#	$(XLD) -o $@ $(BLDDIR)/edge_combined_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
+#$(OUTDIR)/combine_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_combine_$(EDGE_CONFIG).o $(LIBDEP)
+#	$(XLD) -o $@ $(BLDDIR)/edge_combine_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
+
+
+$(OUTDIR)/test_local_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_local.test_$(EDGE_CONFIG).o $(LIBDEP)
+	$(XLD) -o $@ $(BLDDIR)/edge_local.test_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
+
+$(OUTDIR)/test_neigh_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_neigh.test_$(EDGE_CONFIG).o $(LIBDEP)
+	$(XLD) -o $@ $(BLDDIR)/edge_neigh.test_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
+
+#$(OUTDIR)/test_combine_$(EDGE_CONFIG): $(OUTDIR)/.make $(BLDDIR)/edge_combine.test_$(EDGE_CONFIG).o $(LIBDEP)
+#	$(XLD) -o $@ $(BLDDIR)/edge_combine.test_$(EDGE_CONFIG).o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
+
+# $(OUTDIR)/test_helper: $(SRCDIR)/edge_helper.test.cpp .state $(OUTDIR)/.make $(SRCDIR)/edge_helper.hpp $(ROOTDIR)/Makefile $(DEPDIR)/Makefile.inc $(LIBDEP)
+# 	$(CXX) $(EDGE_CXXFLAGS) $(DFLAGS) $(IFLAGS) $(CTARGET) -c $(SRCDIR)/edge_helper.test.cpp -o $(BLDDIR)/edge_helper.test.o
+# 	$(XLD) -o $@ $(BLDDIR)/edge_helper.test.o $(MAINLIB) $(SLDFLAGS) $(LDFLAGS) $(CLDFLAGS)
 
 $(BLDDIR)/%_$(EDGE_CONFIG).o: $(SRCDIR)/%.cpp .state $(BLDDIR)/.make $(HEADERS) $(ROOTDIR)/Makefile $(DEPDIR)/Makefile.inc
 	$(CXX) $(CXXFLAGS) $(DFLAGS) $(IFLAGS) $(CTARGET) -c $< -o $@
